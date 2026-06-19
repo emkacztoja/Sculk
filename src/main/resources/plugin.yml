@@ -1,0 +1,15 @@
+name: sculk
+version: '${version}'
+main: dev.emkacz.sculk.Sculk
+api-version: '1.20'
+libraries:
+  - net.kyori:adventure-api:4.17.0
+  - net.kyori:adventure-text-minimessage:4.17.0
+  - net.kyori:adventure-platform-bukkit:4.3.3
+
+commands:
+  sculk:
+    description: Sculk AI command suite.
+    usage: /sculk [ask|toggle|reload]
+    aliases: [ask]
+    permission: sculk.use

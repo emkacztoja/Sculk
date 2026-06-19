@@ -1,0 +1,31 @@
+# MacOS DS_Store files
+.DS_Store
+
+# Gradle cache folder
+.gradle
+
+# Gradle build folder
+build/
+
+# Local Minecraft development server
+DevServer/
+
+# IntelliJ IDEA project files
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Eclipse project files
+.classpath
+.project
+.settings/
+bin/
+
+# Virtual machine crash logs
+hs_err_pid*
+replay_pid*
+
+# Common working directories / run files
+run/

@@ -1,0 +1,68 @@
+# Sculk Plugin Configuration
+
+api:
+  # The API endpoint for chat completions. Must be OpenAI-compatible.
+  url: "https://api.deepseek.com/chat/completions"
+  
+  # Authorization token (API Key). Leave blank if not required.
+  token: ""
+  
+  # The model identifier to send in the request payload.
+  model: "deepseek-v4-flash"
+
+  # Timeout in seconds for the API request (local LLMs might need a higher limit).
+  timeout-seconds: 60
+
+  # Max conversation history length per player (0 to disable chat memory)
+  chat-history-size: 5
+
+  # Cooldown between queries per player in seconds (0 to disable cooldown)
+  cooldown-seconds: 0
+
+  # System prompt to frame the AI's behavior and personality
+  system-prompt: "You are a mystical Sculk helper in Minecraft. Keep replies brief, under 2 sentences."
+
+# Custom formatting options
+formatting:
+  # Prefix before the response. Supports MiniMessage format (e.g. <dark_purple>[Sculk]</dark_purple>).
+  prefix: '<white>\<</white><dark_purple>Sculk</dark_purple><white>></white> '
+
+  # Pulsing thinking message shown in action bar while generating response
+  thinking-message: "<dark_purple><obfuscated>k</obfuscated> <dark_purple>Sculk is listening...</dark_purple> <dark_purple><obfuscated>k</obfuscated></dark_purple>"
+
+  # Error message shown if request fails/times out
+  error-message: "<red>Sculk whispers: The void is silent... (Request failed)</red>"
+
+# Sensory feedback settings
+feedback:
+  # Play sculk sensor clicking sound when triggered
+  play-sound: true
+
+  # Spawn sculk charge particles when triggered
+  spawn-particles: true
+
+# Context-Aware Prompting settings
+context:
+  # Enable injecting player context (location, equipment, health, world state)
+  enable-player-context: true
+
+  # Enable injecting server status (time, weather, online players)
+  enable-server-context: true
+
+# AI Action/Tool execution settings
+actions:
+  # Enable AI-triggered actions (HEAL, EFFECT, SOUND, PARTICLE, COMMAND)
+  enable-actions: true
+
+  # Allowed command prefixes that the AI is permitted to run via execute_console_command
+  allowed-commands:
+    - "summon firework_rocket"
+    - "effect give"
+    - "particle"
+    - "give %player% cookie"
+
+# Lore/Knowledge Base settings
+lore:
+  # Enable custom lore/knowledge base injection from lore.txt
+  enable-lore: true
+

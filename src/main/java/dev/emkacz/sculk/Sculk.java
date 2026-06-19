@@ -1,0 +1,185 @@
+package dev.emkacz.sculk;
+
+import com.google.gson.JsonObject;
+import dev.emkacz.sculk.command.SculkCommand;
+import dev.emkacz.sculk.listener.ChatListener;
+import net.kyori.adventure.platform.bukkit.BukkitAudiences;
+import org.bukkit.plugin.java.JavaPlugin;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+public final class Sculk extends JavaPlugin {
+
+    private BukkitAudiences adventure;
+
+    public BukkitAudiences adventure() {
+        if (this.adventure == null) {
+            throw new IllegalStateException("Tried to access Adventure when the plugin was disabled!");
+        }
+        return this.adventure;
+    }
+
+    // Thread-safe states tracking players in Sculk Chat Mode
+    private final Set<UUID> togglePlayers = ConcurrentHashMap.newKeySet();
+
+    // Thread-safe cooldown tracking per player
+    private final Map<UUID, Long> cooldowns = new ConcurrentHashMap<>();
+
+    private String cachedLore = "";
+
+    public String getCachedLore() {
+        return this.cachedLore;
+    }
+
+    public void loadLore() {
+        java.io.File file = new java.io.File(getDataFolder(), "lore.txt");
+        if (!file.exists()) {
+            saveResource("lore.txt", false);
+        }
+        try {
+            this.cachedLore = java.nio.file.Files.readString(file.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (java.io.IOException e) {
+            getLogger().severe("Failed to load lore.txt: " + e.getMessage());
+            this.cachedLore = "";
+        }
+    }
+
+    @Override
+    public void onEnable() {
+        // Initialize Adventure for Spigot integration
+        this.adventure = BukkitAudiences.create(this);
+
+        // Save default config.yml if not already present
+        saveDefaultConfig();
+
+        // Load custom lore/knowledge base
+        loadLore();
+
+        // Register ChatListener
+        ChatListener chatListener = new ChatListener(this);
+        getServer().getPluginManager().registerEvents(chatListener, this);
+
+        // Register Command Executor and Tab Completer
+        SculkCommand commandHandler = new SculkCommand(this, chatListener);
+        Objects.requireNonNull(getCommand("sculk")).setExecutor(commandHandler);
+        Objects.requireNonNull(getCommand("sculk")).setTabCompleter(commandHandler);
+
+        getLogger().info("Sculk plugin enabled successfully!");
+    }
+
+    @Override
+    public void onDisable() {
+        if (this.adventure != null) {
+            this.adventure.close();
+            this.adventure = null;
+        }
+        togglePlayers.clear();
+        cooldowns.clear();
+        getLogger().info("Sculk plugin disabled!");
+    }
+
+    // Toggle Chat Mode
+    public boolean isChatModeEnabled(UUID uuid) {
+        return togglePlayers.contains(uuid);
+    }
+
+    public boolean toggleChatMode(UUID uuid) {
+        if (togglePlayers.contains(uuid)) {
+            togglePlayers.remove(uuid);
+            return false;
+        } else {
+            togglePlayers.add(uuid);
+            return true;
+        }
+    }
+
+    // Cooldown management
+    public boolean isOnCooldown(UUID uuid) {
+        long now = System.currentTimeMillis();
+        Long expiry = cooldowns.get(uuid);
+        if (expiry == null) {
+            return false;
+        }
+        if (expiry <= now) {
+            cooldowns.remove(uuid);
+            return false;
+        }
+        return true;
+    }
+
+    public long getRemainingCooldownSeconds(UUID uuid) {
+        Long expiry = cooldowns.get(uuid);
+        if (expiry == null) {
+            return 0;
+        }
+        long remaining = expiry - System.currentTimeMillis();
+        return Math.max(0, (remaining + 999) / 1000);
+    }
+
+    public void setCooldown(UUID uuid, int seconds) {
+        if (seconds <= 0) return;
+        cooldowns.put(uuid, System.currentTimeMillis() + (seconds * 1000L));
+    }
+
+    // Thread-safe cache of loaded player profiles
+    private final Map<UUID, JsonObject> profileCache = new ConcurrentHashMap<>();
+
+    // Persistent Player Profile management
+    public JsonObject getPlayerProfile(UUID uuid) {
+        return profileCache.computeIfAbsent(uuid, id -> {
+            java.io.File directory = new java.io.File(getDataFolder(), "players");
+            if (!directory.exists()) {
+                directory.mkdirs();
+            }
+            java.io.File file = new java.io.File(directory, id.toString() + ".json");
+            if (!file.exists()) {
+                JsonObject defaultProfile = new JsonObject();
+                defaultProfile.add("history", new com.google.gson.JsonArray());
+                defaultProfile.add("facts", new com.google.gson.JsonArray());
+                defaultProfile.add("landmarks", new JsonObject());
+                return defaultProfile;
+            }
+            try {
+                String content = java.nio.file.Files.readString(file.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+                return com.google.gson.JsonParser.parseString(content).getAsJsonObject();
+            } catch (Exception e) {
+                getLogger().severe("Failed to load player profile for " + id + ": " + e.getMessage());
+                JsonObject defaultProfile = new JsonObject();
+                defaultProfile.add("history", new com.google.gson.JsonArray());
+                defaultProfile.add("facts", new com.google.gson.JsonArray());
+                defaultProfile.add("landmarks", new JsonObject());
+                return defaultProfile;
+            }
+        });
+    }
+
+    public void savePlayerProfileAsync(UUID uuid, JsonObject profile) {
+        final JsonObject profileCopy;
+        synchronized (profile) {
+            profileCopy = profile.deepCopy();
+        }
+        getServer().getScheduler().runTaskAsynchronously(this, () -> {
+            java.io.File directory = new java.io.File(getDataFolder(), "players");
+            if (!directory.exists()) {
+                directory.mkdirs();
+            }
+            java.io.File file = new java.io.File(directory, uuid.toString() + ".json");
+            try {
+                java.nio.file.Files.writeString(
+                    file.toPath(),
+                    new com.google.gson.GsonBuilder().setPrettyPrinting().create().toJson(profileCopy),
+                    java.nio.charset.StandardCharsets.UTF_8
+                );
+            } catch (java.io.IOException e) {
+                getLogger().severe("Failed to save player profile for " + uuid + ": " + e.getMessage());
+            }
+        });
+    }
+
+    public void clearStates(UUID uuid) {
+        togglePlayers.remove(uuid);
+        cooldowns.remove(uuid);
+        profileCache.remove(uuid);
+    }
+}
