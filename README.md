@@ -320,7 +320,7 @@ ls build/libs/Sculk-*.jar
 
 ## 📝 License
 
-This project is proprietary. All rights reserved.
+This project is licensed under the **GNU General Public License v3.0** (GPLv3). See the [LICENSE](LICENSE) file for details.
 
 ---
 
