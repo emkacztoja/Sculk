@@ -29,3 +29,6 @@ replay_pid*
 
 # Common working directories / run files
 run/
+
+# GitHub Wiki local source folder
+wiki/
