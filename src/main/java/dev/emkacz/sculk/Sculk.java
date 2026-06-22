@@ -3,6 +3,7 @@ package dev.emkacz.sculk;
 import com.google.gson.JsonObject;
 import dev.emkacz.sculk.command.SculkCommand;
 import dev.emkacz.sculk.listener.ChatListener;
+import dev.emkacz.sculk.lang.LanguageManager;
 import net.kyori.adventure.platform.bukkit.BukkitAudiences;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -12,6 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class Sculk extends JavaPlugin {
 
     private BukkitAudiences adventure;
+    private LanguageManager languageManager;
 
     public BukkitAudiences adventure() {
         if (this.adventure == null) {
@@ -20,28 +22,74 @@ public final class Sculk extends JavaPlugin {
         return this.adventure;
     }
 
+    public LanguageManager getLanguageManager() {
+        return this.languageManager;
+    }
+
     // Thread-safe states tracking players in Sculk Chat Mode
     private final Set<UUID> togglePlayers = ConcurrentHashMap.newKeySet();
 
     // Thread-safe cooldown tracking per player
     private final Map<UUID, Long> cooldowns = new ConcurrentHashMap<>();
 
-    private String cachedLore = "";
+    private final Map<String, String> cachedLoreMap = new ConcurrentHashMap<>();
 
+    @Deprecated
     public String getCachedLore() {
-        return this.cachedLore;
+        return getCachedLore("default");
+    }
+
+    public String getCachedLore(String lang) {
+        String lore = cachedLoreMap.get(lang.toLowerCase());
+        if (lore != null) {
+            return lore;
+        }
+        String defaultLang = getConfig().getString("default-language", "en").toLowerCase();
+        lore = cachedLoreMap.get(defaultLang);
+        if (lore != null) {
+            return lore;
+        }
+        lore = cachedLoreMap.get("en");
+        if (lore != null) {
+            return lore;
+        }
+        return cachedLoreMap.getOrDefault("default", "");
     }
 
     public void loadLore() {
-        java.io.File file = new java.io.File(getDataFolder(), "lore.txt");
-        if (!file.exists()) {
+        cachedLoreMap.clear();
+
+        // 1. Load default lore.txt
+        java.io.File defaultFile = new java.io.File(getDataFolder(), "lore.txt");
+        if (!defaultFile.exists()) {
             saveResource("lore.txt", false);
         }
         try {
-            this.cachedLore = java.nio.file.Files.readString(file.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+            String defaultLore = java.nio.file.Files.readString(defaultFile.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+            cachedLoreMap.put("default", defaultLore);
         } catch (java.io.IOException e) {
             getLogger().severe("Failed to load lore.txt: " + e.getMessage());
-            this.cachedLore = "";
+        }
+
+        // 2. Load language-specific lore files (e.g. lore_en.txt, lore_pl.txt)
+        List<String> defaultLangs = List.of("en", "pl");
+        for (String lang : defaultLangs) {
+            java.io.File file = new java.io.File(getDataFolder(), "lore_" + lang + ".txt");
+            if (!file.exists()) {
+                try {
+                    saveResource("lore_" + lang + ".txt", false);
+                } catch (Exception e) {
+                    getLogger().severe("Could not save default lore resource: lore_" + lang + ".txt (" + e.getMessage() + ")");
+                }
+            }
+            if (file.exists()) {
+                try {
+                    String lore = java.nio.file.Files.readString(file.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+                    cachedLoreMap.put(lang, lore);
+                } catch (java.io.IOException e) {
+                    getLogger().severe("Failed to load lore_" + lang + ".txt: " + e.getMessage());
+                }
+            }
         }
     }
 
@@ -52,6 +100,10 @@ public final class Sculk extends JavaPlugin {
 
         // Save default config.yml if not already present
         saveDefaultConfig();
+
+        // Initialize and load translations
+        this.languageManager = new LanguageManager(this);
+        this.languageManager.loadTranslations();
 
         // Load custom lore/knowledge base
         loadLore();

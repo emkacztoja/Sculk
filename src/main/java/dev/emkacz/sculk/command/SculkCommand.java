@@ -25,21 +25,26 @@ public class SculkCommand implements CommandExecutor, TabCompleter {
         this.chatListener = chatListener;
     }
 
+    private void sendMessage(CommandSender sender, String key) {
+        String msg = plugin.getLanguageManager().getRawMessage(key, sender);
+        plugin.adventure().sender(sender).sendMessage(MiniMessage.miniMessage().deserialize(msg));
+    }
+
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         // Handle alias "/ask <question>" directly
         if (label.equalsIgnoreCase("ask")) {
             if (!(sender instanceof Player)) {
-                plugin.adventure().sender(sender).sendMessage(MiniMessage.miniMessage().deserialize("<red>Only players can ask Sculk.</red>"));
+                sendMessage(sender, "only-players-ask");
                 return true;
             }
             Player player = (Player) sender;
             if (!player.hasPermission("sculk.use")) {
-                plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize("<red>You do not have permission to ask Sculk.</red>"));
+                sendMessage(player, "no-permission-ask");
                 return true;
             }
             if (args.length == 0) {
-                plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize("<red>Usage: /ask <question></red>"));
+                sendMessage(player, "usage-ask");
                 return true;
             }
             String query = String.join(" ", args);
@@ -57,45 +62,46 @@ public class SculkCommand implements CommandExecutor, TabCompleter {
         switch (sub) {
             case "reload":
                 if (!sender.hasPermission("sculk.admin")) {
-                    plugin.adventure().sender(sender).sendMessage(MiniMessage.miniMessage().deserialize("<red>You do not have permission to reload Sculk.</red>"));
+                    sendMessage(sender, "no-permission-reload");
                     return true;
                 }
                 plugin.reloadConfig();
+                plugin.getLanguageManager().loadTranslations();
                 plugin.loadLore();
-                plugin.adventure().sender(sender).sendMessage(MiniMessage.miniMessage().deserialize("<dark_purple>[Sculk]</dark_purple> <green>Configuration reloaded successfully!</green>"));
+                sendMessage(sender, "reload-success");
                 break;
 
             case "toggle":
             case "chat":
                 if (!(sender instanceof Player)) {
-                    plugin.adventure().sender(sender).sendMessage(MiniMessage.miniMessage().deserialize("<red>Only players can toggle Sculk Chat Mode.</red>"));
+                    sendMessage(sender, "only-players-toggle");
                     return true;
                 }
                 Player player = (Player) sender;
                 if (!player.hasPermission("sculk.use")) {
-                    plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize("<red>You do not have permission to use Sculk.</red>"));
+                    sendMessage(player, "no-permission-toggle");
                     return true;
                 }
                 boolean enabled = plugin.toggleChatMode(player.getUniqueId());
                 if (enabled) {
-                    plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize("<dark_purple>[Sculk]</dark_purple> <green>Sculk Chat Mode enabled! All your messages will query Sculk.</green>"));
+                    sendMessage(player, "chat-mode-enabled");
                 } else {
-                    plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize("<dark_purple>[Sculk]</dark_purple> <red>Sculk Chat Mode disabled.</red>"));
+                    sendMessage(player, "chat-mode-disabled");
                 }
                 break;
 
             case "ask":
                 if (!(sender instanceof Player)) {
-                    plugin.adventure().sender(sender).sendMessage(MiniMessage.miniMessage().deserialize("<red>Only players can ask Sculk.</red>"));
+                    sendMessage(sender, "only-players-ask");
                     return true;
                 }
                 Player askPlayer = (Player) sender;
                 if (!askPlayer.hasPermission("sculk.use")) {
-                    plugin.adventure().player(askPlayer).sendMessage(MiniMessage.miniMessage().deserialize("<red>You do not have permission to ask Sculk.</red>"));
+                    sendMessage(askPlayer, "no-permission-ask");
                     return true;
                 }
                 if (args.length < 2) {
-                    plugin.adventure().player(askPlayer).sendMessage(MiniMessage.miniMessage().deserialize("<red>Usage: /sculk ask <question></red>"));
+                    sendMessage(askPlayer, "usage-sculk-ask");
                     return true;
                 }
                 String query = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
@@ -111,11 +117,11 @@ public class SculkCommand implements CommandExecutor, TabCompleter {
     }
 
     private void sendHelp(CommandSender sender) {
-        plugin.adventure().sender(sender).sendMessage(MiniMessage.miniMessage().deserialize("<dark_purple>--- [Sculk AI Helper] ---</dark_purple>"));
-        plugin.adventure().sender(sender).sendMessage(MiniMessage.miniMessage().deserialize("<gold>/sculk ask <question></gold> - Ask Sculk a direct question."));
-        plugin.adventure().sender(sender).sendMessage(MiniMessage.miniMessage().deserialize("<gold>/sculk toggle</gold> - Toggle chat mode (all chat queries Sculk)."));
+        sendMessage(sender, "help-header");
+        sendMessage(sender, "help-ask");
+        sendMessage(sender, "help-toggle");
         if (sender.hasPermission("sculk.admin")) {
-            plugin.adventure().sender(sender).sendMessage(MiniMessage.miniMessage().deserialize("<gold>/sculk reload</gold> - Reload the configuration."));
+            sendMessage(sender, "help-reload");
         }
     }
 

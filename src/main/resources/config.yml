@@ -1,5 +1,8 @@
 # Sculk Plugin Configuration
 
+# The default language used for console/command messages if the player locale is not supported
+default-language: "en"
+
 api:
   # The API endpoint for chat completions. Must be OpenAI-compatible.
   url: "https://api.deepseek.com/chat/completions"

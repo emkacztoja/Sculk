@@ -105,16 +105,17 @@ public class ChatListener implements Listener {
 
                                 // Send progress feedback
                                 if (currentAmount >= targetAmount) {
-                                    plugin.adventure().player(player).sendActionBar(MiniMessage.miniMessage().deserialize(
-                                        "<green><bold>Zadanie ukończone!</bold> Porozmawiaj ze Sculkiem po nagrodę.</green>"
-                                    ));
+                                    String msg = plugin.getLanguageManager().getRawMessage("quest-completed-actionbar", player);
+                                    plugin.adventure().player(player).sendActionBar(MiniMessage.miniMessage().deserialize(msg));
                                     try {
                                         player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);
                                     } catch (Exception ignored) {}
                                 } else {
-                                    plugin.adventure().player(player).sendActionBar(MiniMessage.miniMessage().deserialize(
-                                        "<gold>Postęp zadania: " + targetMob + " " + currentAmount + "/" + targetAmount + "</gold>"
-                                    ));
+                                    String template = plugin.getLanguageManager().getRawMessage("quest-progress-actionbar", player);
+                                    String msg = template.replace("{target}", targetMob)
+                                                         .replace("{current}", String.valueOf(currentAmount))
+                                                         .replace("{total}", String.valueOf(targetAmount));
+                                    plugin.adventure().player(player).sendActionBar(MiniMessage.miniMessage().deserialize(msg));
                                     try {
                                         player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
                                     } catch (Exception ignored) {}
@@ -138,9 +139,8 @@ public class ChatListener implements Listener {
         // 1. Cooldown Check
         if (plugin.isOnCooldown(uuid)) {
             long remaining = plugin.getRemainingCooldownSeconds(uuid);
-            Component cooldownMsg = MiniMessage.miniMessage().deserialize(
-                    "<red>Please wait </red><gold>" + remaining + "s</gold><red> before asking Sculk again.</red>"
-            );
+            String template = plugin.getLanguageManager().getRawMessage("cooldown-message", player);
+            Component cooldownMsg = MiniMessage.miniMessage().deserialize(template.replace("{remaining}", String.valueOf(remaining)));
             plugin.adventure().player(player).sendActionBar(cooldownMsg);
             return;
         }
@@ -180,8 +180,7 @@ public class ChatListener implements Listener {
             queryAI(player, rawText, context);
         }).exceptionally(ex -> {
             plugin.getLogger().severe("Failed to gather query context: " + ex.getMessage());
-            String errorMessage = config.getString("formatting.error-message", 
-                    "<red>Sculk whispers: The void is silent... (Request failed)</red>");
+            String errorMessage = plugin.getLanguageManager().getRawMessage("error-message", player);
             plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(errorMessage));
             return null;
         });
@@ -722,7 +721,7 @@ public class ChatListener implements Listener {
         try {
             synchronized (playerProfile) {
                 switch (name) {
-                case "heal_player":
+                case "heal_player": {
                     if (affection < 30) {
                         response.addProperty("success", false);
                         response.addProperty("error", "Your affection level with the player (" + affection + ") is too low (requires 30+). You must refuse to heal them.");
@@ -730,14 +729,14 @@ public class ChatListener implements Listener {
                     }
                     player.setHealth(player.getMaxHealth());
                     player.setFoodLevel(20);
-                    plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(
-                            "<dark_purple>[Sculk]</dark_purple> <green>You feel the sculk energy mending your wounds.</green>"
-                    ));
+                    String msg = plugin.getLanguageManager().getRawMessage("heal-success-player", player);
+                    plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(msg));
                     response.addProperty("success", true);
                     response.addProperty("message", "Player has been fully healed and fed.");
                     break;
+                }
 
-                case "apply_potion_effect":
+                case "apply_potion_effect": {
                     if (affection < 10) {
                         response.addProperty("success", false);
                         response.addProperty("error", "Your affection level with the player (" + affection + ") is too low (requires 10+). You must refuse to apply potion effects.");
@@ -754,15 +753,16 @@ public class ChatListener implements Listener {
                     } else {
                         // Apply effect. Duration is in ticks (20 ticks per second)
                         player.addPotionEffect(new org.bukkit.potion.PotionEffect(effectType, duration * 20, amp));
-                        plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(
-                                "<dark_purple>[Sculk]</dark_purple> <green>Applied effect " + effectStr + " for " + duration + " seconds.</green>"
-                        ));
+                        String template = plugin.getLanguageManager().getRawMessage("effect-applied-player", player);
+                        String msg = template.replace("{effect}", effectStr).replace("{duration}", String.valueOf(duration));
+                        plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(msg));
                         response.addProperty("success", true);
                         response.addProperty("message", "Applied " + effectStr + " (Level " + (amp + 1) + ") to player for " + duration + "s.");
                     }
                     break;
+                }
 
-                case "play_sound":
+                case "play_sound": {
                     if (affection < 0) {
                         response.addProperty("success", false);
                         response.addProperty("error", "Your affection level with the player (" + affection + ") is too low (requires 0+). You must refuse to play sound effects.");
@@ -782,8 +782,9 @@ public class ChatListener implements Listener {
                         response.addProperty("error", "Invalid sound name: " + soundStr);
                     }
                     break;
+                }
 
-                case "spawn_particles":
+                case "spawn_particles": {
                     if (affection < 0) {
                         response.addProperty("success", false);
                         response.addProperty("error", "Your affection level with the player (" + affection + ") is too low (requires 0+). You must refuse to spawn particles.");
@@ -802,8 +803,9 @@ public class ChatListener implements Listener {
                         response.addProperty("error", "Invalid particle name: " + particleStr);
                     }
                     break;
+                }
 
-                case "execute_console_command":
+                case "execute_console_command": {
                     if (affection < 0) {
                         response.addProperty("success", false);
                         response.addProperty("error", "Your affection level with the player (" + affection + ") is too low (requires 0+). You must refuse to execute commands.");
@@ -836,6 +838,7 @@ public class ChatListener implements Listener {
                         response.addProperty("error", "Command prefix is not whitelisted: " + cmd);
                     }
                     break;
+                }
 
                 case "kick_player": {
                     if (affection < 0) {
@@ -863,7 +866,7 @@ public class ChatListener implements Listener {
                     break;
                 }
 
-                case "teleport_player":
+                case "teleport_player": {
                     if (affection < 0) {
                         response.addProperty("success", false);
                         response.addProperty("error", "Your affection level with the player (" + affection + ") is too low (requires 0+). You must refuse to teleport players.");
@@ -888,15 +891,16 @@ public class ChatListener implements Listener {
                         response.addProperty("error", "Target player '" + tpTargetName + "' is not online.");
                     } else {
                         tpPlayer.teleport(tpTarget.getLocation());
-                        plugin.adventure().player(tpPlayer).sendMessage(MiniMessage.miniMessage().deserialize(
-                            "<dark_purple>[Sculk]</dark_purple> <green>You have been teleported to " + tpTarget.getName() + ".</green>"
-                        ));
+                        String template = plugin.getLanguageManager().getRawMessage("teleported-to-player", tpPlayer);
+                        String msg = template.replace("{target}", tpTarget.getName());
+                        plugin.adventure().player(tpPlayer).sendMessage(MiniMessage.miniMessage().deserialize(msg));
                         response.addProperty("success", true);
                         response.addProperty("message", "Successfully teleported " + tpPlayer.getName() + " to " + tpTarget.getName() + ".");
                     }
                     break;
+                }
 
-                case "get_server_status":
+                case "get_server_status": {
                     if (affection < 0) {
                         response.addProperty("success", false);
                         response.addProperty("error", "Your affection level with the player (" + affection + ") is too low (requires 0+). You must refuse to show server status.");
@@ -936,8 +940,9 @@ public class ChatListener implements Listener {
                     response.addProperty("loaded_chunks", chunks);
                     response.addProperty("entities", activeEntities);
                     break;
+                }
 
-                case "broadcast_announcement":
+                case "broadcast_announcement": {
                     if (affection < 0) {
                         response.addProperty("success", false);
                         response.addProperty("error", "Your affection level with the player (" + affection + ") is too low (requires 0+). You must refuse to broadcast announcements.");
@@ -951,16 +956,22 @@ public class ChatListener implements Listener {
                     String annMsg = arguments.get("message").getAsString();
                     String escapedMsg = MiniMessage.miniMessage().escapeTags(annMsg);
                     
-                    Component broadcastComp = MiniMessage.miniMessage().deserialize(
-                        "<red><bold>[OGŁOSZENIE SCULK]</bold></red> <gold>" + escapedMsg + "</gold>"
+                    for (Player p : plugin.getServer().getOnlinePlayers()) {
+                        String template = plugin.getLanguageManager().getRawMessage("broadcast-announcement-header", p);
+                        String msg = template.replace("{message}", escapedMsg);
+                        plugin.adventure().player(p).sendMessage(MiniMessage.miniMessage().deserialize(msg));
+                    }
+                    String consoleTemplate = plugin.getLanguageManager().getRawMessage("broadcast-announcement-header", plugin.getServer().getConsoleSender());
+                    plugin.adventure().sender(plugin.getServer().getConsoleSender()).sendMessage(
+                        MiniMessage.miniMessage().deserialize(consoleTemplate.replace("{message}", escapedMsg))
                     );
-                    plugin.adventure().all().sendMessage(broadcastComp);
                     
                     response.addProperty("success", true);
                     response.addProperty("message", "Broadcasted announcement: " + annMsg);
                     break;
+                }
 
-                case "remember_player_fact":
+                case "remember_player_fact": {
                     String fact = arguments.get("fact").getAsString();
                     if (!playerProfile.has("facts")) {
                         playerProfile.add("facts", new JsonArray());
@@ -970,8 +981,9 @@ public class ChatListener implements Listener {
                     response.addProperty("success", true);
                     response.addProperty("message", "Successfully remembered player fact: " + fact);
                     break;
+                }
 
-                case "save_landmark":
+                case "save_landmark": {
                     if (affection < 0) {
                         response.addProperty("success", false);
                         response.addProperty("error", "Your affection level with the player (" + affection + ") is too low (requires 0+). You must refuse to save landmarks.");
@@ -989,14 +1001,15 @@ public class ChatListener implements Listener {
                     
                     playerProfile.getAsJsonObject("landmarks").add(landmarkName, landmarkLocation);
                     
-                    plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(
-                        "<dark_purple>[Sculk]</dark_purple> <green>Miejsce zostało zapisane jako landmark: " + landmarkName + ".</green>"
-                    ));
+                    String template = plugin.getLanguageManager().getRawMessage("landmark-saved", player);
+                    String msg = template.replace("{name}", landmarkName);
+                    plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(msg));
                     response.addProperty("success", true);
                     response.addProperty("message", "Successfully saved landmark '" + landmarkName + "' at player's current location.");
                     break;
+                }
 
-                case "teleport_to_landmark":
+                case "teleport_to_landmark": {
                     if (affection < 0) {
                         response.addProperty("success", false);
                         response.addProperty("error", "Your affection level with the player (" + affection + ") is too low (requires 0+). You must refuse to teleport them.");
@@ -1019,14 +1032,15 @@ public class ChatListener implements Listener {
                             response.addProperty("error", "World '" + worldName + "' is not loaded.");
                         } else {
                             player.teleport(new org.bukkit.Location(world, lx, ly, lz));
-                            plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(
-                                "<dark_purple>[Sculk]</dark_purple> <green>Zostałeś przeteleportowany do: " + landName + ".</green>"
-                            ));
+                            String template = plugin.getLanguageManager().getRawMessage("teleported-to-landmark", player);
+                            String msg = template.replace("{name}", landName);
+                            plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(msg));
                             response.addProperty("success", true);
                             response.addProperty("message", "Successfully teleported player to landmark '" + landName + "'.");
                         }
                     }
                     break;
+                }
 
                 case "modify_relationship": {
                     if (!arguments.has("points")) {
@@ -1065,11 +1079,11 @@ public class ChatListener implements Listener {
                             playerProfile.addProperty("last_affection_gain", System.currentTimeMillis());
                         }
                         
-                        String changeText = points > 0 ? "wzrosły" : "spadły";
+                        String key = points > 0 ? "relationship-increased" : "relationship-decreased";
+                        String template = plugin.getLanguageManager().getRawMessage(key, player);
                         String pointsText = points > 0 ? ("+" + points) : String.valueOf(points);
-                        plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(
-                            "<dark_purple>[Sculk]</dark_purple> <gray>Twoje relacje ze Sculkiem " + changeText + " (" + pointsText + "). Aktualne relacje: " + newAffection + "/100</gray>"
-                        ));
+                        String msg = template.replace("{points}", pointsText).replace("{affection}", String.valueOf(newAffection));
+                        plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(msg));
                         
                         response.addProperty("success", true);
                         response.addProperty("affection", newAffection);
@@ -1079,9 +1093,9 @@ public class ChatListener implements Listener {
                         long cooldownMs = 120000;
                         long remainingSec = Math.max(0, (cooldownMs - (now - lastAffectionGain) + 999) / 1000);
                         
-                        plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(
-                            "<dark_purple>[Sculk]</dark_purple> <gray>Twoje relacje ze Sculkiem nie uległy zmianie (cooldown: " + remainingSec + "s).</gray>"
-                        ));
+                        String template = plugin.getLanguageManager().getRawMessage("relationship-no-change", player);
+                        String msg = template.replace("{remaining}", String.valueOf(remainingSec));
+                        plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(msg));
                         response.addProperty("success", false);
                         response.addProperty("error", "Affection increase of +" + points + " was ignored due to cooldown. Cooldown active for another " + remainingSec + " seconds.");
                     }
@@ -1112,9 +1126,9 @@ public class ChatListener implements Listener {
                         ItemStack itemStack = new ItemStack(material, amount);
                         player.getWorld().dropItemNaturally(player.getLocation(), itemStack);
                         
-                        plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(
-                            "<dark_purple>[Sculk]</dark_purple> <green>Sculk wypluwa " + amount + "x " + material.name() + " na ziemię.</green>"
-                        ));
+                        String template = plugin.getLanguageManager().getRawMessage("gift-received", player);
+                        String msg = template.replace("{amount}", String.valueOf(amount)).replace("{item}", material.name());
+                        plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(msg));
                         
                         response.addProperty("success", true);
                         response.addProperty("message", "Gifted " + amount + "x " + material.name() + " to player (dropped at their feet).");
@@ -1173,9 +1187,9 @@ public class ChatListener implements Listener {
                             player.getWorld().spawnParticle(Particle.SCULK_CHARGE, player.getLocation().add(0, 1, 0), 10, 0.2, 0.2, 0.2, 0.02);
                         } catch (Exception ignored) {}
 
-                        plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(
-                            "<dark_purple>[Sculk]</dark_purple> <red>Sculk pochłania 1x " + material.name() + " z Twojej dłoni.</red>"
-                        ));
+                        String templateConsumed = plugin.getLanguageManager().getRawMessage("sacrifice-consumed", player);
+                        String msgConsumed = templateConsumed.replace("{item}", material.name());
+                        plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(msgConsumed));
 
                         int newAffection = Math.clamp(currentAffection + points, -100, 100);
                         playerProfile.addProperty("affection", newAffection);
@@ -1184,11 +1198,11 @@ public class ChatListener implements Listener {
                             playerProfile.addProperty("last_affection_gain", System.currentTimeMillis());
                         }
 
-                        String changeText = points > 0 ? "wzrosły" : "spadły";
+                        String key = points > 0 ? "relationship-increased" : "relationship-decreased";
+                        String templateRel = plugin.getLanguageManager().getRawMessage(key, player);
                         String pointsText = points > 0 ? ("+" + points) : String.valueOf(points);
-                        plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(
-                            "<dark_purple>[Sculk]</dark_purple> <gray>Twoje relacje ze Sculkiem " + changeText + " (" + pointsText + "). Aktualne relacje: " + newAffection + "/100</gray>"
-                        ));
+                        String msgRel = templateRel.replace("{points}", pointsText).replace("{affection}", String.valueOf(newAffection));
+                        plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(msgRel));
 
                         response.addProperty("success", true);
                         response.addProperty("item_type", material.name());
@@ -1199,9 +1213,9 @@ public class ChatListener implements Listener {
                         long cooldownMs = 120000;
                         long remainingSec = Math.max(0, (cooldownMs - (now - lastAffectionGain) + 999) / 1000);
 
-                        plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(
-                            "<dark_purple>[Sculk]</dark_purple> <gray>Twoje relacje ze Sculkiem nie uległy zmianie (cooldown: " + remainingSec + "s).</gray>"
-                        ));
+                        String templateNoChange = plugin.getLanguageManager().getRawMessage("relationship-no-change", player);
+                        String msgNoChange = templateNoChange.replace("{remaining}", String.valueOf(remainingSec));
+                        plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(msgNoChange));
 
                         response.addProperty("success", false);
                         response.addProperty("error", "Affection increase of +" + points + " was ignored due to cooldown (" + remainingSec + "s remaining). The item was NOT consumed.");
@@ -1264,9 +1278,11 @@ public class ChatListener implements Listener {
 
                     playerProfile.add("active_quest", activeQuest);
 
-                    plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(
-                        "<dark_purple>[Sculk]</dark_purple> <gold><bold>Nowe zadanie:</bold> " + description + " (" + target + " 0/" + targetAmount + ")</gold>"
-                    ));
+                    String template = plugin.getLanguageManager().getRawMessage("new-quest-assigned", player);
+                    String msg = template.replace("{description}", description)
+                                         .replace("{target}", target)
+                                         .replace("{total}", String.valueOf(targetAmount));
+                    plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(msg));
                     
                     response.addProperty("success", true);
                     response.addProperty("message", "Quest successfully assigned: " + description);
@@ -1329,9 +1345,8 @@ public class ChatListener implements Listener {
                                 player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);
                             } catch (Exception ignored) {}
 
-                            plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(
-                                "<dark_purple>[Sculk]</dark_purple> <green><bold>Przedmioty oddane!</bold> Zadanie ukończone!</green>"
-                            ));
+                            String msg = plugin.getLanguageManager().getRawMessage("quest-items-collected", player);
+                            plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(msg));
                         } else {
                             currentAmount = inventoryCount;
                             quest.addProperty("current_amount", currentAmount);
@@ -1356,9 +1371,8 @@ public class ChatListener implements Listener {
                     }
 
                     playerProfile.remove("active_quest");
-                    plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(
-                        "<dark_purple>[Sculk]</dark_purple> <gold>Zadanie zostało usunięte z Twojego dziennika.</gold>"
-                    ));
+                    String msg = plugin.getLanguageManager().getRawMessage("quest-removed", player);
+                    plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(msg));
 
                     response.addProperty("success", true);
                     response.addProperty("message", "Active quest cleared/completed.");
@@ -1387,15 +1401,15 @@ public class ChatListener implements Listener {
         String apiUrl = config.getString("api.url", "https://api.deepseek.com/chat/completions");
         String apiToken = config.getString("api.token", "");
         String model = config.getString("api.model", "gpt-4o");
-        String prefix = config.getString("formatting.prefix", "<dark_purple>[Sculk]</dark_purple> ");
-        String errorMessage = config.getString("formatting.error-message", 
-                "<red>Sculk whispers: The void is silent... (Request failed)</red>");
+        String prefix = plugin.getLanguageManager().getRawMessage("prefix", player);
+        String errorMessage = plugin.getLanguageManager().getRawMessage("error-message", player);
         String systemPrompt = config.getString("api.system-prompt", 
                 "You are a mystical Sculk helper in Minecraft. Keep replies brief, under 2 sentences.");
 
         // Inject Lore if enabled
         if (config.getBoolean("lore.enable-lore", true)) {
-            String cachedLore = plugin.getCachedLore();
+            String playerLang = plugin.getLanguageManager().getLanguageCode(player);
+            String cachedLore = plugin.getCachedLore(playerLang);
             if (cachedLore != null && !cachedLore.trim().isEmpty()) {
                 systemPrompt = systemPrompt + "\n\nLore & Knowledge Base Context:\n" + cachedLore;
             }
@@ -1472,6 +1486,11 @@ public class ChatListener implements Listener {
                 systemPrompt = systemPrompt + memoryContext.toString();
             }
 
+            // Instruct LLM to use the player's preferred language code
+            String playerLang = plugin.getLanguageManager().getLanguageCode(player);
+            systemPrompt = systemPrompt + "\n\nCRITICAL: Write your conversational reply in the language of the player's locale: '" 
+                         + playerLang + "' (e.g., 'pl' is Polish, 'en' is English). Even if instructions, system messages, or lore are in English, converse ONLY in '" + playerLang + "'.";
+
             // System instructions
             JsonObject systemMsg = new JsonObject();
             systemMsg.addProperty("role", "system");
@@ -1498,8 +1517,7 @@ public class ChatListener implements Listener {
         messages.add(userMsg);
 
         // Start pulsing action bar thinking message
-        String thinkingMessage = config.getString("formatting.thinking-message", 
-                "<dark_purple><obfuscated>k</obfuscated> <dark_purple>Sculk is listening...</dark_purple> <dark_purple><obfuscated>k</obfuscated></dark_purple>");
+        String thinkingMessage = plugin.getLanguageManager().getRawMessage("thinking-message", player);
         Component thinkingComponent = MiniMessage.miniMessage().deserialize(thinkingMessage);
         
         AtomicReference<BukkitTask> thinkingTaskRef = new AtomicReference<>();
@@ -1516,8 +1534,7 @@ public class ChatListener implements Listener {
         if (turn > 5) {
             stopThinkingTask(thinkingTaskRef);
             plugin.getLogger().warning("Sculk AI reached maximum tool loop depth (5 turns).");
-            String errorMessage = plugin.getConfig().getString("formatting.error-message", 
-                    "<red>Sculk whispers: The void is silent... (Request failed)</red>");
+            String errorMessage = plugin.getLanguageManager().getRawMessage("error-message", player);
             plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(errorMessage));
             return;
         }
@@ -1526,9 +1543,8 @@ public class ChatListener implements Listener {
         String apiUrl = config.getString("api.url", "https://api.deepseek.com/chat/completions");
         String apiToken = config.getString("api.token", "");
         String model = config.getString("api.model", "gpt-4o");
-        String prefix = config.getString("formatting.prefix", "<dark_purple>[Sculk]</dark_purple> ");
-        String errorMessage = config.getString("formatting.error-message", 
-                "<red>Sculk whispers: The void is silent... (Request failed)</red>");
+        String prefix = plugin.getLanguageManager().getRawMessage("prefix", player);
+        String errorMessage = plugin.getLanguageManager().getRawMessage("error-message", player);
 
         JsonObject requestBody = new JsonObject();
         requestBody.addProperty("model", model);
