@@ -1486,9 +1486,9 @@ public class ChatListener implements Listener {
                 systemPrompt = systemPrompt + memoryContext.toString();
             }
 
-            // Instruct LLM to use the player's preferred language code
+            // Instruct LLM to use the server's configured language code
             String playerLang = plugin.getLanguageManager().getLanguageCode(player);
-            systemPrompt = systemPrompt + "\n\nCRITICAL: Write your conversational reply in the language of the player's locale: '" 
+            systemPrompt = systemPrompt + "\n\nCRITICAL: Write your conversational reply in the configured language of the server: '" 
                          + playerLang + "' (e.g., 'pl' is Polish, 'en' is English). Even if instructions, system messages, or lore are in English, converse ONLY in '" + playerLang + "'.";
 
             // System instructions

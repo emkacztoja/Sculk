@@ -1,6 +1,6 @@
 # Sculk Plugin Configuration
 
-# The default language used for console/command messages if the player locale is not supported
+# The global language used for all players on the server (e.g. en, pl, de, es, fr)
 default-language: "en"
 
 api:

@@ -59,12 +59,6 @@ public class LanguageManager {
     }
 
     public String getLanguageCode(CommandSender sender) {
-        if (sender instanceof Player player) {
-            String localeStr = player.getLocale();
-            if (localeStr != null && localeStr.length() >= 2) {
-                return localeStr.substring(0, 2).toLowerCase();
-            }
-        }
         return defaultLang;
     }
 
