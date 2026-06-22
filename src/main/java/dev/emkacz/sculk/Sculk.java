@@ -140,6 +140,9 @@ public final class Sculk extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (this.aiService != null) {
+            this.aiService.shutdown();
+        }
         if (this.adventure != null) {
             this.adventure.close();
             this.adventure = null;
@@ -251,5 +254,19 @@ public final class Sculk extends JavaPlugin {
         togglePlayers.remove(uuid);
         cooldowns.remove(uuid);
         profileCache.remove(uuid);
+    }
+
+    public void clearPlayerProfile(UUID uuid) {
+        JsonObject defaultProfile = new JsonObject();
+        defaultProfile.add("history", new com.google.gson.JsonArray());
+        defaultProfile.add("facts", new com.google.gson.JsonArray());
+        defaultProfile.add("landmarks", new JsonObject());
+        defaultProfile.addProperty("affection", 0);
+
+        profileCache.put(uuid, defaultProfile);
+        savePlayerProfileAsync(uuid, defaultProfile);
+
+        togglePlayers.remove(uuid);
+        cooldowns.remove(uuid);
     }
 }

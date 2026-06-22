@@ -121,6 +121,21 @@ public class LanguageManager {
             case "cooldown-message" -> "<red>Please wait </red><gold>{remaining}s</gold><red> before asking Sculk again.</red>";
             case "thinking-message" -> "<dark_purple><obfuscated>k</obfuscated> <dark_purple>Sculk is listening...</dark_purple> <dark_purple><obfuscated>k</obfuscated></dark_purple>";
             case "error-message" -> "<red>Sculk whispers: The void is silent... (Request failed)</red>";
+            case "only-players-clear-self" -> "<red>Only players can clear their own profile. Please specify a player name.</red>";
+            case "no-permission-clear" -> "<red>You do not have permission to clear player profiles.</red>";
+            case "command-clear-success-self" -> "<dark_purple>[Sculk]</dark_purple> <green>Your profile memory, facts, and landmarks have been cleared!</green>";
+            case "command-clear-success-other" -> "<dark_purple>[Sculk]</dark_purple> <green>Cleared profile memory, facts, and landmarks for {player}!</green>";
+            case "player-not-found" -> "<red>Player '{player}' not found or has never played here.</red>";
+            case "only-players-status" -> "<red>Only players can check status. Please specify a player name.</red>";
+            case "no-permission-status" -> "<red>You do not have permission to check status.</red>";
+            case "no-permission-status-other" -> "<red>You do not have permission to check other players' status.</red>";
+            case "status-header" -> "<dark_purple>--- [Sculk Status: {player}] ---</dark_purple>";
+            case "status-affection" -> "<gold>Affection:</gold> <white>{affection} (-100 to +100)</white>";
+            case "status-quest-active" -> "<gold>Active Quest:</gold> <white>{description} ({current}/{total} {target})</white>";
+            case "status-quest-none" -> "<gold>Active Quest:</gold> <white>None</white>";
+            case "status-landmarks" -> "<gold>Landmarks:</gold> <white>{landmarks}</white>";
+            case "help-clear" -> "<gold>/sculk clear [player]</gold> - Clear profile memory, facts, and landmarks.";
+            case "help-status" -> "<gold>/sculk status [player]</gold> - Display affection, active quest, and landmarks.";
             default -> "";
         };
     }

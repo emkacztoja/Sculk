@@ -25,8 +25,9 @@ public class ChatListener implements Listener {
         String rawText = event.getMessage();
         UUID uuid = player.getUniqueId();
 
-        // Check if message contains keyword "sculk" OR if player has chat mode toggled on
-        if (rawText.toLowerCase().contains("sculk") || plugin.isChatModeEnabled(uuid)) {
+        // Check if message contains the configured trigger keyword OR if player has chat mode toggled on
+        String trigger = plugin.getConfig().getString("trigger-keyword", "sculk").toLowerCase();
+        if (rawText.toLowerCase().contains(trigger) || plugin.isChatModeEnabled(uuid)) {
             // Process the query asynchronously via the AIService
             plugin.getAIService().processQuery(player, rawText);
         }

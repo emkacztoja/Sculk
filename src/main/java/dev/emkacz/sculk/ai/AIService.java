@@ -44,6 +44,16 @@ public class AIService {
         this.gson = new Gson();
     }
 
+    public void shutdown() {
+        if (this.httpClient != null) {
+            try {
+                this.httpClient.close();
+            } catch (Exception e) {
+                plugin.getLogger().warning("Error closing HttpClient: " + e.getMessage());
+            }
+        }
+    }
+
     /**
      * Processes the player query asynchronously without blocking the server main loop.
      * Safely schedules context-gathering tasks and feedback on the main Bukkit thread first.
@@ -125,6 +135,29 @@ public class AIService {
                 sb.append("- Equipment: ").append(player.getInventory().getItemInMainHand().getType().name()).append("\n");
             } else {
                 sb.append("- Equipment: Empty hand\n");
+            }
+
+            int radius = config.getInt("context.nearby-entities-radius", 10);
+            if (radius > 0) {
+                try {
+                    java.util.List<org.bukkit.entity.Entity> entities = player.getNearbyEntities(radius, radius, radius);
+                    if (!entities.isEmpty()) {
+                        java.util.Map<String, Integer> counts = new java.util.HashMap<>();
+                        for (org.bukkit.entity.Entity entity : entities) {
+                            String typeName = entity.getType().name().toLowerCase();
+                            counts.put(typeName, counts.getOrDefault(typeName, 0) + 1);
+                        }
+                        java.util.List<String> list = new java.util.ArrayList<>();
+                        for (java.util.Map.Entry<String, Integer> entry : counts.entrySet()) {
+                            list.add(entry.getValue() + "x " + entry.getKey());
+                        }
+                        sb.append("- Nearby Entities: ").append(String.join(", ", list)).append("\n");
+                    } else {
+                        sb.append("- Nearby Entities: None\n");
+                    }
+                } catch (Exception e) {
+                    plugin.getLogger().warning("Failed to gather nearby entities for " + player.getName() + ": " + e.getMessage());
+                }
             }
         }
 
@@ -277,9 +310,10 @@ public class AIService {
     }
 
     private void runCompletionLoop(Player player, String rawText, JsonArray messages, int turn, AtomicReference<BukkitTask> thinkingTaskRef, JsonObject playerProfile) {
-        if (turn > 5) {
+        int maxTurns = plugin.getConfig().getInt("api.max-tool-turns", 5);
+        if (turn > maxTurns) {
             stopThinkingTask(thinkingTaskRef);
-            plugin.getLogger().warning("Sculk AI reached maximum tool loop depth (5 turns).");
+            plugin.getLogger().warning("Sculk AI reached maximum tool loop depth (" + maxTurns + " turns).");
             String errorMessage = plugin.getLanguageManager().getRawMessage("error-message", player);
             plugin.adventure().player(player).sendMessage(MiniMessage.miniMessage().deserialize(errorMessage));
             return;
@@ -301,6 +335,15 @@ public class AIService {
 
         sendHttpRequestAsync(apiUrl, apiToken, requestBody, turn)
                 .thenAccept(responseJson -> {
+                    // Log token usage if present
+                    if (responseJson.has("usage")) {
+                        JsonObject usage = responseJson.getAsJsonObject("usage");
+                        int promptTokens = usage.has("prompt_tokens") ? usage.get("prompt_tokens").getAsInt() : 0;
+                        int completionTokens = usage.has("completion_tokens") ? usage.get("completion_tokens").getAsInt() : 0;
+                        int totalTokens = usage.has("total_tokens") ? usage.get("total_tokens").getAsInt() : 0;
+                        plugin.getLogger().info(String.format("AI Turn %d API usage for %s: %d prompt, %d completion, %d total tokens",
+                                turn, player.getName(), promptTokens, completionTokens, totalTokens));
+                    }
                     if (responseJson.has("choices") && responseJson.getAsJsonArray("choices").size() > 0) {
                         JsonObject choice = responseJson.getAsJsonArray("choices").get(0).getAsJsonObject();
                         JsonObject messageObj = choice.getAsJsonObject("message");
@@ -451,8 +494,13 @@ public class AIService {
                     Component parsedResponse = MiniMessage.miniMessage().deserialize(miniMessageFormatted);
                     Component finalMessage = parsedPrefix.append(parsedResponse);
 
-                    // Broadcast to all players
-                    plugin.adventure().all().sendMessage(finalMessage);
+                    // Deliver response based on configured mode
+                    String responseMode = plugin.getConfig().getString("response-mode", "broadcast").toLowerCase();
+                    if ("private".equals(responseMode)) {
+                        plugin.adventure().player(player).sendMessage(finalMessage);
+                    } else {
+                        plugin.adventure().all().sendMessage(finalMessage);
+                    }
                     return;
                 }
             }

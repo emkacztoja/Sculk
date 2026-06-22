@@ -3,6 +3,12 @@
 # The global language used for all players on the server (e.g. en, pl, de, es, fr)
 default-language: "en"
 
+# The keyword in chat that triggers Sculk response (case-insensitive)
+trigger-keyword: "sculk"
+
+# How response is delivered: "broadcast" (to all players) or "private" (only to the asking player)
+response-mode: "broadcast"
+
 api:
   # The API endpoint for chat completions. Must be OpenAI-compatible.
   url: "https://api.deepseek.com/chat/completions"
@@ -18,6 +24,9 @@ api:
 
   # Max conversation history length per player (0 to disable chat memory)
   chat-history-size: 5
+
+  # Max recursive tool invocation loop depth
+  max-tool-turns: 5
 
   # Cooldown between queries per player in seconds (0 to disable cooldown)
   cooldown-seconds: 0
@@ -51,6 +60,9 @@ context:
 
   # Enable injecting server status (time, weather, online players)
   enable-server-context: true
+
+  # Radius in blocks to check for nearby entities (mobs/players) to inject into context (0 to disable)
+  nearby-entities-radius: 10
 
 # AI Action/Tool execution settings
 actions:
