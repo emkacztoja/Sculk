@@ -3,7 +3,10 @@ package dev.emkacz.sculk;
 import com.google.gson.JsonObject;
 import dev.emkacz.sculk.command.SculkCommand;
 import dev.emkacz.sculk.listener.ChatListener;
+import dev.emkacz.sculk.listener.QuestListener;
 import dev.emkacz.sculk.lang.LanguageManager;
+import dev.emkacz.sculk.action.ActionManager;
+import dev.emkacz.sculk.ai.AIService;
 import net.kyori.adventure.platform.bukkit.BukkitAudiences;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -14,6 +17,8 @@ public final class Sculk extends JavaPlugin {
 
     private BukkitAudiences adventure;
     private LanguageManager languageManager;
+    private ActionManager actionManager;
+    private AIService aiService;
 
     public BukkitAudiences adventure() {
         if (this.adventure == null) {
@@ -24,6 +29,14 @@ public final class Sculk extends JavaPlugin {
 
     public LanguageManager getLanguageManager() {
         return this.languageManager;
+    }
+
+    public ActionManager getActionManager() {
+        return this.actionManager;
+    }
+
+    public AIService getAIService() {
+        return this.aiService;
     }
 
     // Thread-safe states tracking players in Sculk Chat Mode
@@ -108,12 +121,17 @@ public final class Sculk extends JavaPlugin {
         // Load custom lore/knowledge base
         loadLore();
 
+        // Initialize actions and AI service
+        this.actionManager = new ActionManager(this);
+        this.aiService = new AIService(this);
+
         // Register ChatListener
         ChatListener chatListener = new ChatListener(this);
         getServer().getPluginManager().registerEvents(chatListener, this);
+        getServer().getPluginManager().registerEvents(new QuestListener(this), this);
 
         // Register Command Executor and Tab Completer
-        SculkCommand commandHandler = new SculkCommand(this, chatListener);
+        SculkCommand commandHandler = new SculkCommand(this);
         Objects.requireNonNull(getCommand("sculk")).setExecutor(commandHandler);
         Objects.requireNonNull(getCommand("sculk")).setTabCompleter(commandHandler);
 

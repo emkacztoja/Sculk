@@ -18,11 +18,9 @@ import java.util.stream.Collectors;
 public class SculkCommand implements CommandExecutor, TabCompleter {
 
     private final Sculk plugin;
-    private final ChatListener chatListener;
 
-    public SculkCommand(Sculk plugin, ChatListener chatListener) {
+    public SculkCommand(Sculk plugin) {
         this.plugin = plugin;
-        this.chatListener = chatListener;
     }
 
     private void sendMessage(CommandSender sender, String key) {
@@ -48,7 +46,7 @@ public class SculkCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             String query = String.join(" ", args);
-            chatListener.processQuery(player, query);
+            plugin.getAIService().processQuery(player, query);
             return true;
         }
 
@@ -105,7 +103,7 @@ public class SculkCommand implements CommandExecutor, TabCompleter {
                     return true;
                 }
                 String query = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
-                chatListener.processQuery(askPlayer, query);
+                plugin.getAIService().processQuery(askPlayer, query);
                 break;
 
             default:
