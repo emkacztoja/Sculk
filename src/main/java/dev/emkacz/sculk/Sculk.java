@@ -72,7 +72,7 @@ public final class Sculk extends JavaPlugin {
         }
 
         // 2. Load language-specific lore files (e.g. lore_en.txt, lore_pl.txt)
-        List<String> defaultLangs = List.of("en", "pl");
+        List<String> defaultLangs = List.of("en", "pl", "de", "es", "fr");
         for (String lang : defaultLangs) {
             java.io.File file = new java.io.File(getDataFolder(), "lore_" + lang + ".txt");
             if (!file.exists()) {

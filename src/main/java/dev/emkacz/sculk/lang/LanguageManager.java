@@ -29,7 +29,7 @@ public class LanguageManager {
         }
 
         // Copy default languages from resources if not present
-        List<String> defaultLangs = List.of("en", "pl");
+        List<String> defaultLangs = List.of("en", "pl", "de", "es", "fr");
         for (String lang : defaultLangs) {
             File file = new File(plugin.getDataFolder(), "lang/messages_" + lang + ".yml");
             if (!file.exists()) {
