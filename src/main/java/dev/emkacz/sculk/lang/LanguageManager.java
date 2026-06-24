@@ -136,6 +136,23 @@ public class LanguageManager {
             case "status-landmarks" -> "<gold>Landmarks:</gold> <white>{landmarks}</white>";
             case "help-clear" -> "<gold>/sculk clear [player]</gold> - Clear profile memory, facts, and landmarks.";
             case "help-status" -> "<gold>/sculk status [player]</gold> - Display affection, active quest, and landmarks.";
+            case "help-profile" -> "<gold>/sculk profile <player></gold> - (Admin) Dump the full player profile as JSON.";
+            case "no-permission-profile" -> "<red>You do not have permission to view player profiles.</red>";
+            case "usage-profile" -> "<red>Usage: /sculk profile <player></red>";
+            case "profile-header" -> "<dark_purple>--- [Sculk Profile: {player}] ---</dark_purple>";
+            case "profile-section-affection" -> "<gold>Affection:</gold> <white>{affection}</white>";
+            case "profile-section-quest" -> "<gold>Active quest:</gold> <white>{quest}</white>";
+            case "profile-section-quest-none" -> "<gold>Active quest:</gold> <white>none</white>";
+            case "profile-section-landmarks" -> "<gold>Landmarks:</gold> <white>{landmarks}</white>";
+            case "profile-section-landmarks-none" -> "<gold>Landmarks:</gold> <white>none</white>";
+            case "profile-section-facts" -> "<gold>Long-term facts:</gold>";
+            case "profile-section-facts-none" -> "<gold>Long-term facts:</gold> <white>none</white>";
+            case "profile-section-history" -> "<gold>Recent history (last {count} turns):</gold>";
+            case "profile-section-history-none" -> "<gold>Recent history:</gold> <white>empty</white>";
+            case "server-busy" -> "<red>Sculk is busy serving other players. Please wait a moment and try again.</red>";
+            case "quest-auto-completed" -> "<dark_purple>[Sculk]</dark_purple> <green><bold>Quest completed!</bold> Talk to Sculk to claim your reward.</green>";
+            case "target-protected" -> "<red>That player is protected and cannot be targeted by Sculk.</red>";
+            case "cannot-target-self" -> "<red>Sculk cannot target the player who triggered the action.</red>";
             default -> "";
         };
     }

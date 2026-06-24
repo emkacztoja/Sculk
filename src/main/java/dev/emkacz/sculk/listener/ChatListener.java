@@ -9,9 +9,28 @@ import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerKickEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
+import java.util.Locale;
 import java.util.UUID;
 
 public class ChatListener implements Listener {
+
+    public enum TriggerMode {
+        /** The trigger keyword appears anywhere in the message (default). */
+        CONTAINS,
+        /** The message starts with the trigger keyword followed by a space. */
+        PREFIX,
+        /** The message is @<mention-keyword> <rest>. */
+        MENTION;
+
+        public static TriggerMode fromConfig(String value) {
+            if (value == null) return CONTAINS;
+            return switch (value.toLowerCase(Locale.ROOT)) {
+                case "prefix" -> PREFIX;
+                case "mention" -> MENTION;
+                default -> CONTAINS;
+            };
+        }
+    }
 
     private final Sculk plugin;
 
@@ -25,10 +44,7 @@ public class ChatListener implements Listener {
         String rawText = event.getMessage();
         UUID uuid = player.getUniqueId();
 
-        // Check if message contains the configured trigger keyword OR if player has chat mode toggled on
-        String trigger = plugin.getConfig().getString("trigger-keyword", "sculk").toLowerCase();
-        if (rawText.toLowerCase().contains(trigger) || plugin.isChatModeEnabled(uuid)) {
-            // Process the query asynchronously via the AIService
+        if (matchesTrigger(rawText) || plugin.isChatModeEnabled(uuid)) {
             plugin.getAIService().processQuery(player, rawText);
         }
     }
@@ -41,5 +57,31 @@ public class ChatListener implements Listener {
     @EventHandler
     public void onPlayerKick(PlayerKickEvent event) {
         plugin.clearStates(event.getPlayer().getUniqueId());
+    }
+
+    /**
+     * Decide whether {@code rawText} should trigger Sculk based on the configured
+     * trigger mode. Chat-mode toggled players always match.
+     */
+    private boolean matchesTrigger(String rawText) {
+        TriggerMode mode = TriggerMode.fromConfig(plugin.getConfig().getString("trigger-mode", "contains"));
+        return switch (mode) {
+            case PREFIX -> {
+                String keyword = plugin.getConfig().getString("trigger-keyword", "sculk").toLowerCase(Locale.ROOT);
+                String lower = rawText.toLowerCase(Locale.ROOT);
+                yield lower.startsWith(keyword + " ") || lower.equals(keyword);
+            }
+            case MENTION -> {
+                String mention = plugin.getConfig().getString("mention-keyword", "sculk");
+                String lower = rawText.toLowerCase(Locale.ROOT);
+                yield lower.startsWith("@" + mention.toLowerCase(Locale.ROOT) + " ")
+                        || lower.startsWith("@" + mention.toLowerCase(Locale.ROOT) + ":")
+                        || lower.equals("@" + mention.toLowerCase(Locale.ROOT));
+            }
+            case CONTAINS -> {
+                String keyword = plugin.getConfig().getString("trigger-keyword", "sculk").toLowerCase(Locale.ROOT);
+                yield rawText.toLowerCase(Locale.ROOT).contains(keyword);
+            }
+        };
     }
 }

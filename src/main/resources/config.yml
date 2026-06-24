@@ -3,19 +3,26 @@
 # The global language used for all players on the server (e.g. en, pl, de, es, fr)
 default-language: "en"
 
-# The keyword in chat that triggers Sculk response (case-insensitive)
+# How the chat trigger matches incoming messages:
+#   "contains" — message contains the trigger keyword (default, may false-positive on words like "sculk farm")
+#   "prefix"   — message STARTS with the trigger keyword followed by a space
+#   "mention"  — message is "@<mention-keyword> <rest>" (case-insensitive)
+trigger-mode: "contains"
 trigger-keyword: "sculk"
+mention-keyword: "sculk"
 
-# How response is delivered: "broadcast" (to all players) or "private" (only to the asking player)
-response-mode: "broadcast"
+# How response is delivered:
+#   "broadcast" — to all players on the server
+#   "private"   — only to the asking player (recommended)
+response-mode: "private"
 
 api:
   # The API endpoint for chat completions. Must be OpenAI-compatible.
   url: "https://api.deepseek.com/chat/completions"
-  
+
   # Authorization token (API Key). Leave blank if not required.
   token: ""
-  
+
   # The model identifier to send in the request payload.
   model: "deepseek-v4-flash"
 
@@ -28,8 +35,17 @@ api:
   # Max recursive tool invocation loop depth
   max-tool-turns: 5
 
-  # Cooldown between queries per player in seconds (0 to disable cooldown)
+  # Seconds between queries per player (0 to disable cooldown)
   cooldown-seconds: 0
+
+  # Seconds between positive affection gains per player (sacrifice anti-spam).
+  # The AI may set bypass_cooldown=true to skip this for high-value offerings.
+  positive-affection-cooldown-seconds: 120
+
+  # Max concurrent in-flight LLM HTTP requests across the whole server.
+  # Protects the upstream LLM from being flooded by bursts (e.g. 50 players all
+  # hitting the trigger at once). Excess requests wait in a FIFO semaphore.
+  max-concurrent-requests: 4
 
   # System prompt to frame the AI's behavior and personality
   system-prompt: "You are a mystical Sculk helper in Minecraft. Keep replies brief, under 2 sentences."
@@ -44,6 +60,11 @@ formatting:
 
   # Error message shown if request fails/times out
   error-message: "<red>Sculk whispers: The void is silent... (Request failed)</red>"
+
+  # How often (in ticks) the action-bar "thinking" indicator refreshes.
+  # 20 ticks = 1s. Lower = smoother text animation, higher = less chatty.
+  # The action bar runs on the MAIN thread (Bukkit API requirement).
+  thinking-actionbar-ticks: 20
 
 # Sensory feedback settings
 feedback:
@@ -66,7 +87,7 @@ context:
 
 # AI Action/Tool execution settings
 actions:
-  # Enable AI-triggered actions (HEAL, EFFECT, SOUND, PARTICLE, COMMAND)
+  # Enable AI-triggered actions (HEAL, EFFECT, SOUND, PARTICLE, COMMAND, ...)
   enable-actions: true
 
   # Allowed command prefixes that the AI is permitted to run via execute_console_command
@@ -76,8 +97,35 @@ actions:
     - "particle"
     - "give %player% cookie"
 
+  # Per-tool affection thresholds. The AI tool is hidden/denied below the player's
+  # affection score. Anything not listed here defaults to 0.
+  thresholds:
+    heal_player: 30
+    gift_item_to_player: 20
+    apply_potion_effect: 10
+    play_sound: 0
+    spawn_particles: 0
+    execute_console_command: 0
+    save_landmark: 0
+    teleport_to_landmark: 0
+    start_quest: 0
+    check_quest_status: 0
+    complete_quest: 0
+    modify_relationship: 0
+    sacrifice_held_item: 0
+    remember_player_fact: 0
+    kick_player: 0
+    teleport_player: 0
+    get_server_status: 0
+    broadcast_announcement: 0
+
 # Lore/Knowledge Base settings
 lore:
   # Enable custom lore/knowledge base injection from lore.txt
   enable-lore: true
 
+# Usage tracking
+usage:
+  # Append prompt/completion/total token counts to plugins/sculk/usage.log after each LLM call.
+  # CSV format. Set to false to silence.
+  log-to-file: true

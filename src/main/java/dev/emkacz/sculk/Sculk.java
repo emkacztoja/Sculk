@@ -1,16 +1,28 @@
 package dev.emkacz.sculk;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import dev.emkacz.sculk.command.SculkCommand;
-import dev.emkacz.sculk.listener.ChatListener;
-import dev.emkacz.sculk.listener.QuestListener;
-import dev.emkacz.sculk.lang.LanguageManager;
 import dev.emkacz.sculk.action.ActionManager;
 import dev.emkacz.sculk.ai.AIService;
+import dev.emkacz.sculk.command.SculkCommand;
+import dev.emkacz.sculk.lang.LanguageManager;
+import dev.emkacz.sculk.listener.ChatListener;
+import dev.emkacz.sculk.listener.QuestListener;
+import dev.emkacz.sculk.util.PlayerProfile;
+import dev.emkacz.sculk.util.ProfileSaver;
+import dev.emkacz.sculk.util.RequestGate;
+import dev.emkacz.sculk.util.UsageLogger;
 import net.kyori.adventure.platform.bukkit.BukkitAudiences;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.util.*;
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class Sculk extends JavaPlugin {
@@ -19,6 +31,9 @@ public final class Sculk extends JavaPlugin {
     private LanguageManager languageManager;
     private ActionManager actionManager;
     private AIService aiService;
+    private RequestGate requestGate;
+    private ProfileSaver profileSaver;
+    private UsageLogger usageLogger;
 
     public BukkitAudiences adventure() {
         if (this.adventure == null) {
@@ -37,6 +52,23 @@ public final class Sculk extends JavaPlugin {
 
     public AIService getAIService() {
         return this.aiService;
+    }
+
+    public RequestGate getRequestGate() {
+        return this.requestGate;
+    }
+
+    public ProfileSaver getProfileSaver() {
+        return this.profileSaver;
+    }
+
+    public UsageLogger getUsageLogger() {
+        return this.usageLogger;
+    }
+
+    /** Read-only view of the in-memory profile cache, used by the dirty-flag flush. */
+    public Map<UUID, JsonObject> profileCacheView() {
+        return java.util.Collections.unmodifiableMap(profileCache);
     }
 
     // Thread-safe states tracking players in Sculk Chat Mode
@@ -73,21 +105,21 @@ public final class Sculk extends JavaPlugin {
         cachedLoreMap.clear();
 
         // 1. Load default lore.txt
-        java.io.File defaultFile = new java.io.File(getDataFolder(), "lore.txt");
+        File defaultFile = new File(getDataFolder(), "lore.txt");
         if (!defaultFile.exists()) {
             saveResource("lore.txt", false);
         }
         try {
-            String defaultLore = java.nio.file.Files.readString(defaultFile.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+            String defaultLore = Files.readString(defaultFile.toPath(), StandardCharsets.UTF_8);
             cachedLoreMap.put("default", defaultLore);
-        } catch (java.io.IOException e) {
+        } catch (IOException e) {
             getLogger().severe("Failed to load lore.txt: " + e.getMessage());
         }
 
         // 2. Load language-specific lore files (e.g. lore_en.txt, lore_pl.txt)
-        List<String> defaultLangs = List.of("en", "pl", "de", "es", "fr");
+        java.util.List<String> defaultLangs = java.util.List.of("en", "pl", "de", "es", "fr");
         for (String lang : defaultLangs) {
-            java.io.File file = new java.io.File(getDataFolder(), "lore_" + lang + ".txt");
+            File file = new File(getDataFolder(), "lore_" + lang + ".txt");
             if (!file.exists()) {
                 try {
                     saveResource("lore_" + lang + ".txt", false);
@@ -97,9 +129,9 @@ public final class Sculk extends JavaPlugin {
             }
             if (file.exists()) {
                 try {
-                    String lore = java.nio.file.Files.readString(file.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+                    String lore = Files.readString(file.toPath(), StandardCharsets.UTF_8);
                     cachedLoreMap.put(lang, lore);
-                } catch (java.io.IOException e) {
+                } catch (IOException e) {
                     getLogger().severe("Failed to load lore_" + lang + ".txt: " + e.getMessage());
                 }
             }
@@ -121,6 +153,13 @@ public final class Sculk extends JavaPlugin {
         // Load custom lore/knowledge base
         loadLore();
 
+        // Initialize rate limit, profile saver, usage log
+        int maxConcurrent = Math.max(0, getConfig().getInt("api.max-concurrent-requests", 4));
+        this.requestGate = new RequestGate(maxConcurrent);
+        this.profileSaver = new ProfileSaver(this);
+        this.profileSaver.start();
+        this.usageLogger = new UsageLogger(this);
+
         // Initialize actions and AI service
         this.actionManager = new ActionManager(this);
         this.aiService = new AIService(this);
@@ -135,13 +174,17 @@ public final class Sculk extends JavaPlugin {
         Objects.requireNonNull(getCommand("sculk")).setExecutor(commandHandler);
         Objects.requireNonNull(getCommand("sculk")).setTabCompleter(commandHandler);
 
-        getLogger().info("Sculk plugin enabled successfully!");
+        getLogger().info("Sculk plugin enabled successfully! (request gate: " + maxConcurrent + " concurrent)");
     }
 
     @Override
     public void onDisable() {
         if (this.aiService != null) {
             this.aiService.shutdown();
+        }
+        if (this.profileSaver != null) {
+            this.profileSaver.stop();
+            this.profileSaver.flushAllSync();
         }
         if (this.adventure != null) {
             this.adventure.close();
@@ -198,56 +241,68 @@ public final class Sculk extends JavaPlugin {
     // Thread-safe cache of loaded player profiles
     private final Map<UUID, JsonObject> profileCache = new ConcurrentHashMap<>();
 
+    /**
+     * Returns the canonical "empty" profile. Every new profile MUST be created
+     * via this method so the schema stays consistent across
+     * {@link #getPlayerProfile(UUID)} and {@link #clearPlayerProfile(UUID)}.
+     * Delegates to {@link PlayerProfile#empty()} so the shape is testable.
+     */
+    public static JsonObject newDefaultProfile() {
+        return PlayerProfile.empty();
+    }
+
     // Persistent Player Profile management
     public JsonObject getPlayerProfile(UUID uuid) {
         return profileCache.computeIfAbsent(uuid, id -> {
-            java.io.File directory = new java.io.File(getDataFolder(), "players");
+            File directory = new File(getDataFolder(), "players");
             if (!directory.exists()) {
                 directory.mkdirs();
             }
-            java.io.File file = new java.io.File(directory, id.toString() + ".json");
+            File file = new File(directory, id.toString() + ".json");
             if (!file.exists()) {
-                JsonObject defaultProfile = new JsonObject();
-                defaultProfile.add("history", new com.google.gson.JsonArray());
-                defaultProfile.add("facts", new com.google.gson.JsonArray());
-                defaultProfile.add("landmarks", new JsonObject());
-                return defaultProfile;
+                return PlayerProfile.empty();
             }
             try {
-                String content = java.nio.file.Files.readString(file.toPath(), java.nio.charset.StandardCharsets.UTF_8);
-                return com.google.gson.JsonParser.parseString(content).getAsJsonObject();
+                String content = Files.readString(file.toPath(), StandardCharsets.UTF_8);
+                JsonObject loaded = com.google.gson.JsonParser.parseString(content).getAsJsonObject();
+                PlayerProfile.ensureShape(loaded);
+                return loaded;
             } catch (Exception e) {
                 getLogger().severe("Failed to load player profile for " + id + ": " + e.getMessage());
-                JsonObject defaultProfile = new JsonObject();
-                defaultProfile.add("history", new com.google.gson.JsonArray());
-                defaultProfile.add("facts", new com.google.gson.JsonArray());
-                defaultProfile.add("landmarks", new JsonObject());
-                return defaultProfile;
+                return PlayerProfile.empty();
             }
         });
     }
 
-    public void savePlayerProfileAsync(UUID uuid, JsonObject profile) {
-        final JsonObject profileCopy;
-        synchronized (profile) {
-            profileCopy = profile.deepCopy();
+    /**
+     * Mark a profile as needing persistence on the next flush tick.
+     * Prefer this over {@link #savePlayerProfileAsync(UUID, JsonObject)} for
+     * high-frequency call sites (mob kills, fact adds).
+     */
+    public void markPlayerProfileDirty(UUID uuid) {
+        if (profileSaver != null) {
+            profileSaver.markDirty(uuid);
         }
-        getServer().getScheduler().runTaskAsynchronously(this, () -> {
-            java.io.File directory = new java.io.File(getDataFolder(), "players");
-            if (!directory.exists()) {
-                directory.mkdirs();
-            }
-            java.io.File file = new java.io.File(directory, uuid.toString() + ".json");
-            try {
-                java.nio.file.Files.writeString(
-                    file.toPath(),
-                    new com.google.gson.GsonBuilder().setPrettyPrinting().create().toJson(profileCopy),
-                    java.nio.charset.StandardCharsets.UTF_8
-                );
-            } catch (java.io.IOException e) {
-                getLogger().severe("Failed to save player profile for " + uuid + ": " + e.getMessage());
-            }
-        });
+    }
+
+    /**
+     * Async-save a profile. Use for important state changes (player quit,
+     * profile clear) where we want the write scheduled but don't want to
+     * block the calling thread.
+     */
+    public void savePlayerProfileAsync(UUID uuid, JsonObject profile) {
+        if (profileSaver != null) {
+            profileSaver.saveAsync(uuid, profile);
+        }
+    }
+
+    /**
+     * Synchronous save. Use only on shutdown where the scheduler is gone.
+     */
+    public void savePlayerProfileSync(UUID uuid, JsonObject profile) {
+        if (profileSaver != null) {
+            profileSaver.saveSync(uuid, profile);
+        }
     }
 
     public void clearStates(UUID uuid) {
@@ -257,14 +312,11 @@ public final class Sculk extends JavaPlugin {
     }
 
     public void clearPlayerProfile(UUID uuid) {
-        JsonObject defaultProfile = new JsonObject();
-        defaultProfile.add("history", new com.google.gson.JsonArray());
-        defaultProfile.add("facts", new com.google.gson.JsonArray());
-        defaultProfile.add("landmarks", new JsonObject());
-        defaultProfile.addProperty("affection", 0);
-
+        JsonObject defaultProfile = PlayerProfile.empty();
         profileCache.put(uuid, defaultProfile);
-        savePlayerProfileAsync(uuid, defaultProfile);
+        if (profileSaver != null) {
+            profileSaver.saveSync(uuid, defaultProfile);
+        }
 
         togglePlayers.remove(uuid);
         cooldowns.remove(uuid);
