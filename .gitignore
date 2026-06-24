@@ -32,3 +32,6 @@ run/
 
 # GitHub Wiki local source folder
 wiki/
+
+# mavis / MiniMax session runtime data (plans, scratchpads)
+.mavis/
